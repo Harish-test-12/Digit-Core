@@ -26,8 +26,10 @@ jobs:
     steps:
       - name: Check if workflow dispatch is triggered
         if: github.event_name == 'workflow_dispatch'
-        run: echo "Workflow dispatched to branch ${{ github.event.inputs.branch }}"
-
+        run: |
+          echo "Workflow dispatched to branch ${{ github.event.inputs.branch }}"
+          echo "GitHub event: ${{ toJson(github.event) }}"
+          
       - name: Check out the code
         uses: actions/checkout@v4
         with:
@@ -56,7 +58,6 @@ jobs:
         with:
           file: build/maven/Dockerfile
           push: true
-          branch: ${{ github.event.inputs.branch }}
           tags: ${{ secrets.DOCKERHUB_USER }}/${{ github.event.inputs.serviceName }}:${{ github.event.inputs.branch }}
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
           
