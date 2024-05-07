@@ -54,17 +54,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Display branch name
-        run: git branch
-        
       - name: Debug Branch
         run: |
           echo "Branch used for build and push: ${{ github.event.inputs.branch }}"
 
       - name: Build and push
-        # if: github.ref == 'refs/heads/${{ github.event.inputs.branch }}'
         uses: docker/build-push-action@v5
         with:
+          context: . # Use the root directory as the build context
           file: build/maven/Dockerfile
           push: true
           tags: ${{ secrets.DOCKERHUB_USER }}/${{ github.event.inputs.serviceName }}:${{ github.event.inputs.branch }}
