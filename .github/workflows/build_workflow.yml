@@ -56,6 +56,10 @@ jobs:
 
       - name: Display branch name
         run: git branch
+        
+      - name: Debug Branch
+        run: |
+          echo "Branch used for build and push: ${{ github.event.inputs.branch }}"
 
       - name: Build and push
         # if: github.ref == 'refs/heads/${{ github.event.inputs.branch }}'
