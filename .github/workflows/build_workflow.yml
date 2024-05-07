@@ -7,7 +7,7 @@ on:
         required: true
         default: 'master'
       folder:
-        description: 'Select the folder which contains your services'
+        description: 'Select the folder which contain your services'
         required: true
         type: choice
         options:
@@ -17,7 +17,7 @@ on:
         description: 'Provide the service name you want to build'
         required: true
       dbMigration:
-        description: Enable if you require db migration for this service
+        description: Enable if you require db migration to this service
         required: true
         type: boolean
 jobs:
@@ -26,14 +26,15 @@ jobs:
     steps:
       - name: Check if workflow dispatch is triggered
         if: github.event_name == 'workflow_dispatch'
-        run: |
-          echo "Workflow dispatched to branch ${{ github.event.inputs.branch }}"
-          echo "GitHub event: ${{ toJson(github.event) }}"
-          
+        run: echo "Workflow dispatched to branch ${{ github.event.inputs.branch }}"
+
       - name: Check out the code
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.branch }}
+
+      - name: Display branch name
+        run: git branch
 
       - name: Archive business-services folder
         run: tar -czf business-services.tar.gz business-services/
@@ -53,11 +54,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Display branch name
+        run: git branch
+
       - name: Build and push
+        # if: github.ref == 'refs/heads/${{ github.event.inputs.branch }}'
         uses: docker/build-push-action@v5
         with:
           file: build/maven/Dockerfile
           push: true
           tags: ${{ secrets.DOCKERHUB_USER }}/${{ github.event.inputs.serviceName }}:${{ github.event.inputs.branch }}
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
-          
