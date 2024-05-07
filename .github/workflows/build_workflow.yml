@@ -56,5 +56,7 @@ jobs:
         with:
           file: build/maven/Dockerfile
           push: true
+          branch: ${{ github.event.inputs.branch }}
           tags: ${{ secrets.DOCKERHUB_USER }}/${{ github.event.inputs.serviceName }}:${{ github.event.inputs.branch }}
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
+          
