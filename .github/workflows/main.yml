@@ -1,0 +1,39 @@
+name: Docker Build and Push
+
+on:
+  push:
+    branches:
+      - master  # Triggers the workflow when there's a push to the 'master' branch
+  pull_request:
+    branches:
+      - master  # Runs on pull requests targeting the 'master' branch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}  # Set Docker Hub username in GitHub Secrets
+          password: ${{ secrets.DOCKER_PASSWORD }}  # Set Docker Hub password in GitHub Secrets
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile  # Path to Dockerfile
+          push: true          # Set to 'false' if you don't want to push
+          tags: |
+            harish7303/to-do:latest
+            harish7303/to-do:${{ github.sha }} 
+
+      - name: Verify the built image
+        run: docker images  # Lists all images to verify the built image
