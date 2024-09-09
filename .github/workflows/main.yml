@@ -30,7 +30,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile  # Path to Dockerfile
-          push: true          # Set to 'false' if you don't want to push
+          push: false          # Set to 'false' if you don't want to push
           tags: |
             harish7303/to-do:latest
             harish7303/to-do:${{ github.sha }} 
