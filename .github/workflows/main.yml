@@ -29,7 +29,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile  # Path to Dockerfile
+          file: ./build/maven/Dockerfile  # Path to Dockerfile
           push: false          # Set to 'false' if you don't want to push
           tags: |
             harish7303/to-do:latest
