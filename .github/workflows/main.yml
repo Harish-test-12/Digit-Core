@@ -27,7 +27,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
-          context: .
+          context: business-services/build/maven
+          dockerfile: business-services/build/maven/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: harish7303/testjodejsapp:latest
           labels: ${{ steps.meta.outputs.labels }}
