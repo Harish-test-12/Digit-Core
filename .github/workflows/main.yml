@@ -1,41 +1,33 @@
-name: Docker Build and Push
+name: Publish Docker image
 
 on:
   push:
-    branches:
-      - master  # Triggers the workflow when there's a push to the 'master' branch
-  pull_request:
-    branches:
-      - master  # Runs on pull requests targeting the 'master' branch
+    branches: ['master']
 
 jobs:
-  build:
+  push_to_registry:
+    name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Check out the repo
         uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      
+      - name: Log in to Docker Hub
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}  # Set Docker Hub username in GitHub Secrets
-          password: ${{ secrets.DOCKER_PASSWORD }}  # Set Docker Hub password in GitHub Secrets
-
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          images: harish7303/testjodejsapp
+      
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: .
-          file: ./build/maven/Dockerfile  # Path to Dockerfile
           push: true
-          tags: |
-            harish7303/to-do:latest
-            harish7303/to-do:${{ github.sha }}
-          build-args: |
-            work-dir=business-services/billing-service/src/main/resources/db
-
-      - name: Verify the built image
-        run: docker images  # Lists all images to verify the built image
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
