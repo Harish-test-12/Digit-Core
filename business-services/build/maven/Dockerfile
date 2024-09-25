@@ -10,7 +10,7 @@ COPY business-services/billing-service/pom.xml ./pom.xml
 RUN mvn -B dependency:go-offline
 
 # Copy the source code
-COPY business-services/billing-service/src
+COPY business-services/billing-service/src/main/resources/db ./src
 
 # Package the application
 RUN mvn -B -f /app/pom.xml package
