@@ -1,27 +1,29 @@
 
+# Stage 1: Build the application
 FROM egovio/alpine-maven-builder-jdk-8:1-master-NA-6036091e AS build
-ARG WORK_DIR
+
+# Set the working directory
 WORKDIR /app
 
-# copy the project files
-COPY ${WORK_DIR}/pom.xml ./pom.xml
-COPY build/maven/start.sh ./start.sh
+# Copy the pom.xml file and install dependencies
+COPY business-services/billing-service/pom.xml ./pom.xml
+RUN mvn -B dependency:go-offline
 
-# not useful for stateless builds
-# RUN mvn -B dependency:go-offline
+# Copy the source code
+COPY business-services/billing-service/src ./src
 
-COPY ${WORK_DIR}/src ./src
+# Package the application
 RUN mvn -B -f /app/pom.xml package
 
+# Stage 2: Create the final image
+FROM egovio/8-openjdk-alpine:latest
 
-# Create runtime image
-FROM egovio/8-openjdk-alpine
+# Set the working directory for the final image
+WORKDIR /app
 
+# Copy the jar file from the build stage
+COPY --from=build /app/target/billing-service.jar ./billing-service.jar
 
-WORKDIR /opt/egov
+# Set the entrypoint for the application
+ENTRYPOINT ["java", "-jar", "billing-service.jar"]
 
-COPY --from=build /app/target/*.jar /app/start.sh /opt/egov/
-
-RUN chmod +x /opt/egov/start.sh
-
-CMD ["/opt/egov/start.sh"]
