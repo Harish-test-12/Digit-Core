@@ -30,7 +30,7 @@ jobs:
       - name: Build and push Docker image (Main Service)
         uses: docker/build-push-action@v4
         with:
-          context: builds/business-services/${{ env.service_name }}  # Use the build path from config
+          context: build/business-services/${{ env.service_name }}  # Use the build path from config
           file: build/maven/Dockerfile  # Use the Dockerfile from the config
           push: true
           tags: harish7303/${{ env.service_name }}:latest
