@@ -9,7 +9,7 @@ jobs:
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
     env:
-      service_name: "testjodejsapp"  # Define the service name here
+      service_name: "billing-service"  # Change to the specific service
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -24,22 +24,24 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: harish7303/testjodejsapp
+          images: harish7303/${{ env.service_name }}
       
-      - name: Build and push Docker image (First Service)
+      # Build and push the main Docker image for the billing service
+      - name: Build and push Docker image (Main Service)
         uses: docker/build-push-action@v4
         with:
-          context: business-services/build/maven
-          file: business-services/build/maven/Dockerfile
-          push: true
-          tags: harish7303/testjodejsapp:latest
-          labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Build and push Docker image (Second Service)
-        uses: docker/build-push-action@v4
-        with:
-          context: business-services/${{ env.service_name }}
-          file: business-services/${{ env.service_name }}/Dockerfile
+          context: builds/business-services/${{ env.service_name }}  # Use the build path from config
+          file: build/maven/Dockerfile  # Use the Dockerfile from the config
           push: true
           tags: harish7303/${{ env.service_name }}:latest
+          labels: ${{ steps.meta.outputs.labels }}
+      
+      # Build and push the db image for the billing service
+      - name: Build and push Docker image (DB Service)
+        uses: docker/build-push-action@v4
+        with:
+          context: billing-service/src/main/resources/db  # Context as specified in config
+          file: billing-service/src/main/resources/db/Dockerfile  # Dockerfile for DB
+          push: true
+          tags: harish7303/${{ env.service_name }}-db:latest
           labels: ${{ steps.meta.outputs.labels }}
