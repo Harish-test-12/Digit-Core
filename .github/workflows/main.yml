@@ -37,6 +37,8 @@ jobs:
           push: true
           tags: harish7303/${{ env.service_name }}:latest
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            CACHE_BUST=${{ github.run_id }}
       
       # Build and push the db image for the billing service
       - name: Build and push Docker image (DB Service)
