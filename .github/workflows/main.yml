@@ -9,10 +9,12 @@ jobs:
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
     env:
-      service_name: "billing-service"  # Change to the specific service
+      service_name: "billing-service"
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
@@ -30,8 +32,8 @@ jobs:
       - name: Build and push Docker image (Main Service)
         uses: docker/build-push-action@v4
         with:
-          context: ./business/billing-service  # Use the build path from config
-          file: build/maven/Dockerfile  # Use the Dockerfile from the config
+          context: business-services/billing-service
+          file: build/maven/Dockerfile
           push: true
           tags: harish7303/${{ env.service_name }}:latest
           labels: ${{ steps.meta.outputs.labels }}
@@ -40,8 +42,8 @@ jobs:
       - name: Build and push Docker image (DB Service)
         uses: docker/build-push-action@v4
         with:
-          context: billing-service/src/main/resources/db  # Context as specified in config
-          file: billing-service/src/main/resources/db/Dockerfile  # Dockerfile for DB
+          context: business-services/billing-service/src/main/resources/db
+          file: business-services/billing-service/src/main/resources/db/Dockerfile
           push: true
           tags: harish7303/${{ env.service_name }}-db:latest
           labels: ${{ steps.meta.outputs.labels }}
