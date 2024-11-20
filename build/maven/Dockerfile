@@ -8,7 +8,7 @@ WORKDIR /app
 COPY ${WORK_DIR}/pom.xml ./pom.xml
 RUN var1=$(pwd) && echo ${var1}
 RUN var2=$(ls build/maven) && echo ${var2}
-COPY "build/maven/start.sh" ./start.sh
+COPY $(pwd)/build/maven/start.sh ./start.sh
 
 # not useful for stateless builds
 # RUN mvn -B dependency:go-offline
