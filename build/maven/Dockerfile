@@ -5,6 +5,8 @@ WORKDIR /app
 
 # copy the project files
 COPY ${WORK_DIR}/pom.xml ./pom.xml
+RUN pwd
+RUN ls build/maven
 COPY "build/maven/start.sh" ./start.sh
 
 # not useful for stateless builds
