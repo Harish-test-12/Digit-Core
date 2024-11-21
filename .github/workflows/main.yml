@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       folder:
-        description: 'Select the folder which contain your services'
+        description: 'Select the folder which contains your services'
         required: true
         type: choice
         options:
@@ -16,9 +16,10 @@ on:
         description: 'Provide the service name you want to build'
         required: true
       dbMigration:
-        description: Enable if you require db migration to this service
+        description: Enable if you require DB migration for this service
         required: true
         type: boolean
+
 jobs:
   Build:
     if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -27,13 +28,12 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v4
 
-      - name: What
+      - name: Extract branch name and commit hash
         run: |
           echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
+          echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
           echo "BRANCH=${GITHUB_REF##*/}"
-
-      - name: Display branch name
-        run: git branch
+          echo "COMMIT_HASH=$(git rev-parse --short HEAD)"
 
       - name: Archive business-services folder
         run: tar -czf business-services.tar.gz business-services/
@@ -53,16 +53,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Display branch name
-        run: git branch
-
-      - name: Build and push
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: build/maven/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ github.run_number }}
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
         
       - name: DB Build and push
@@ -72,4 +70,5 @@ jobs:
           context: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db
           file: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ env.BRANCH }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ github.run_number }}
