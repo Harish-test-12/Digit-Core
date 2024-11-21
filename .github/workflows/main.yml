@@ -1,17 +1,27 @@
-name: Build and push
+name: Build and push Docker images
 
 on:
   push:
-    branches: ['master']
+    branches:
+      - 'master'
+  workflow_dispatch:
+    inputs:
+      services:
+        description: "billing-service,collection-services"
+        required: false
+        default: "billing-service"
 
 jobs:
-  push_to_registry:
-    name: Push Docker image to Docker Hub
+  build_and_push:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJson(env.SERVICES) }}
     env:
-      service_name: "collection-services"
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
     steps:
-      - name: Check out the repo
+      - name: Check out the repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -19,33 +29,50 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+
+      - name: Determine services
+        id: determine-services
+        run: |
+          if [ "${{ github.event.inputs.services }}" != "" ]; then
+            echo "Using provided services: ${{ github.event.inputs.services }}"
+            echo "${{ github.event.inputs.services }}" | tr ',' '\n' | jq -R . | jq -s . > services.json
+          else
+            echo "Using default services: billing-service,collection-services"
+            echo '["billing-service", "collection-services"]' > services.json
+          fi
+          cat services.json
+        shell: bash
+        env:
+          SERVICES: ${{ github.event.inputs.services }}
+
+      - name: Set matrix services
+        run: echo "SERVICES=$(cat services.json)" >> $GITHUB_ENV
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: harish7303/${{ env.service_name }}
-      
-      # Build and push the main Docker image for the billing service
+          images: harish7303/${{ matrix.service }}
+
       - name: Build and push Docker image (Main Service)
         uses: docker/build-push-action@v4
         with:
           context: .
           file: build/maven/Dockerfile
           push: true
-          tags: harish7303/${{ env.service_name }}:latest
+          tags: harish7303/${{ matrix.service }}:latest
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            WORK_DIR=business-services/collection-services
+            WORK_DIR=business-services/${{ matrix.service }}
 
-      # Build and push the db image for the billing service
       - name: Build and push Docker image (DB Service)
+        if: success() && (matrix.service == 'collection-services' || matrix.service == 'billing-service')
         uses: docker/build-push-action@v4
         with:
-          context: business-services/collection-services/src/main/resources/db
-          file: business-services/collection-services/src/main/resources/db/Dockerfile
+          context: business-services/${{ matrix.service }}/src/main/resources/db
+          file: business-services/${{ matrix.service }}/src/main/resources/db/Dockerfile
           push: true
-          tags: harish7303/${{ env.service_name }}-db:latest
+          tags: harish7303/${{ matrix.service }}-db:latest
           labels: ${{ steps.meta.outputs.labels }}
