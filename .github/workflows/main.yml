@@ -6,10 +6,18 @@ on:
       - 'master'
   workflow_dispatch:
     inputs:
-      services:
-        description: "billing-service,collection-services"
-        required: false
+      Folder:
+        description: "Select the folder which contain your services"
+        required: true
         # default: "billing-service"
+      serviceName:
+        description: 'Provide the service name you want to build'
+        required: true
+      # dbMigration:
+      #   description: Enable if you require db migration to this service
+      #   required: true
+      #   type: boolean
+        
 
 jobs:
   determine_services:
@@ -31,7 +39,7 @@ jobs:
           else
             echo "Using default services: billing-service,collection-services"
             echo '["billing-service", "collection-services"]' > services.json
-          fi
+          if
           cat services.json
           echo "::set-output name=services::$(cat services.json)"
         shell: bash
