@@ -9,7 +9,7 @@ jobs:
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
     env:
-      service_name: "billing-service"
+      service_name: "collection-services"
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -38,14 +38,14 @@ jobs:
           tags: harish7303/${{ env.service_name }}:latest
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            WORK_DIR=business-services/billing-service
+            WORK_DIR=business-services/collection-services
 
       # Build and push the db image for the billing service
       - name: Build and push Docker image (DB Service)
         uses: docker/build-push-action@v4
         with:
-          context: business-services/billing-service/src/main/resources/db
-          file: business-services/billing-service/src/main/resources/db/Dockerfile
+          context: business-services/collection-services/src/main/resources/db
+          file: business-services/collection-services/src/main/resources/db/Dockerfile
           push: true
           tags: harish7303/${{ env.service_name }}-db:latest
           labels: ${{ steps.meta.outputs.labels }}
