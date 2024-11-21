@@ -7,30 +7,22 @@ on:
   workflow_dispatch:
     inputs:
       services:
-        description: "billing-service,collection-services"
+        description: "Comma-separated list of services to build (e.g., billing-service,collection-services)"
         required: false
-        default: "billing-service"
+        default: "billing-service,collection-services"
 
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: ${{ fromJson(env.SERVICES) }}
-    env:
-      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+    # Determine services dynamically
+    outputs:
+      services: ${{ steps.determine-services.outputs.services }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ env.DOCKER_PASSWORD }}
 
       - name: Determine services
         id: determine-services
@@ -46,9 +38,24 @@ jobs:
         shell: bash
         env:
           SERVICES: ${{ github.event.inputs.services }}
+        outputs:
+          services: ${{ steps.determine-services.outputs.services }}
 
-      - name: Set matrix services
-        run: echo "SERVICES=$(cat services.json)" >> $GITHUB_ENV
+  # Build and push jobs for each service
+  build_images:
+    needs: build_and_push
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.build_and_push.outputs.services) }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -68,7 +75,7 @@ jobs:
             WORK_DIR=business-services/${{ matrix.service }}
 
       - name: Build and push Docker image (DB Service)
-        if: success() && (matrix.service == 'collection-services' || matrix.service == 'billing-service')
+        if: matrix.service == 'collection-services' || matrix.service == 'billing-service'
         uses: docker/build-push-action@v4
         with:
           context: business-services/${{ matrix.service }}/src/main/resources/db
