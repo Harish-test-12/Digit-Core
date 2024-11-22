@@ -104,6 +104,10 @@ jobs:
 
       - name: Pull Docker Image
         run: |
-          IMAGE_TAG=${{ github.event.inputs.tag || 'latest' }}
-          echo "Pulling image: ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:$IMAGE_TAG"
-          docker pull ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:$IMAGE_TAG
+          DOCKER_TAG="${{ needs.Build.outputs.docker_tag }}"
+          echo "Pulling image: $DOCKER_TAG"
+          docker pull $DOCKER_TAG
+        # run: |
+        #   IMAGE_TAG=${{ github.event.inputs.tag || 'latest' }}
+        #   echo "Pulling image: ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:$IMAGE_TAG"
+        #   docker pull ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:$IMAGE_TAG
