@@ -60,9 +60,8 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ env.VERSION }}
           build-args:
             WORK_DIR: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
-
   DB_Build:
-    if: ${{ github.event.inputs.dbMigration == 'true' }}
+    if: ${{ github.event.inputs.dbMigration == true }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out the code
