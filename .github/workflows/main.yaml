@@ -16,23 +16,25 @@ on:
         description: 'Provide the service name you want to build'
         required: true
       dbMigration:
-        description: Enable if you require DB migration for this service
+        description: Enable if you require DB migration for this service'
         required: true
         type: boolean
-      branch:  # Added new input for branch selection
-        description: 'Specify the branch you want to build'
+      branch:
+        description: 'Select the branch to build'
         required: true
-        default: 'master'  # Default value is master
+        type: choice
+        options: # Add your commonly used branches here
+          - master
+          - core-2.9-lts-mvn-check
 
 jobs:
   Build:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out the code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.branch }} 
+          ref: ${{ github.event.inputs.branch }} # Use the selected branch
 
       - name: Ensure .version exists
         run: |
@@ -43,12 +45,8 @@ jobs:
       - name: Extract branch name and commit hash
         id: tag
         run: |
-          BRANCH=${GITHUB_REF##*/}
+          BRANCH=${{ github.event.inputs.branch }}
           COMMIT_HASH=$(git rev-parse --short HEAD)
-
-          # Fallback if variables are empty
-          [ -z "$BRANCH" ] && BRANCH="default-branch"
-          [ -z "$COMMIT_HASH" ] && COMMIT_HASH="no-commit"
 
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
@@ -57,19 +55,9 @@ jobs:
         id: version
         run: |
           VERSION=$(cat .version)
-          echo "VERSION=$VERSION"
           echo $((VERSION + 1)) > .version
           echo "::set-output name=version::$VERSION"
         shell: bash
-
-      - name: Archive business-services folder
-        run: tar -czf business-services.tar.gz business-services/
-
-      - name: Upload business-services folder as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: business-services-artifact
-          path: business-services.tar.gz
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
