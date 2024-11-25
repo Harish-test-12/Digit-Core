@@ -45,11 +45,16 @@ jobs:
       - name: Extract branch name and commit hash
         id: tag
         run: |
+          # Extract the branch name from the event or use a fallback
           BRANCH=${GITHUB_REF##*/}
+          # If the branch name is 'master' or empty, replace it with 'main' or another default
+          [ -z "$BRANCH" ] && BRANCH="main"
+          [ "$BRANCH" == "master" ] && BRANCH="main"
+
+          # Extract the commit hash
           COMMIT_HASH=$(git rev-parse --short HEAD)
 
-          # Fallback if variables are empty
-          [ -z "$BRANCH" ] && BRANCH="default-branch"
+          # Fallback for commit hash if it's empty
           [ -z "$COMMIT_HASH" ] && COMMIT_HASH="no-commit"
 
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
@@ -99,12 +104,10 @@ jobs:
         id: tag
         run: |
           BRANCH=${GITHUB_REF##*/}
+          [ -z "$BRANCH" ] && BRANCH="main"
+          [ "$BRANCH" == "master" ] && BRANCH="main"
           COMMIT_HASH=$(git rev-parse --short HEAD)
-
-          # Fallback if variables are empty
-          [ -z "$BRANCH" ] && BRANCH="default-branch"
           [ -z "$COMMIT_HASH" ] && COMMIT_HASH="no-commit"
-
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
 
