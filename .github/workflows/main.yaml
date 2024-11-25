@@ -46,6 +46,7 @@ jobs:
         id: tag
         run: |
           BRANCH=${{ github.event.inputs.branch }}
+          BRANCH=$(echo $BRANCH | tr -cd '[:alnum:]-_')
           COMMIT_HASH=$(git rev-parse --short HEAD || echo "no-commit")
           VERSION=$(cat .version 2>/dev/null || echo "0")
 
@@ -67,6 +68,8 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ env.VERSION }}
+
+
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
 
   DB_Build:
@@ -103,4 +106,5 @@ jobs:
           file: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ env.VERSION }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ env.VERSION }}
+
