@@ -37,6 +37,7 @@ jobs:
       - name: Extract branch name and commit hash
         id: tag
         run: |
+          # Extract branch name
           BRANCH=${GITHUB_REF##*/}
           COMMIT_HASH=$(git rev-parse --short HEAD)
 
@@ -44,27 +45,28 @@ jobs:
           [ -z "$BRANCH" ] && BRANCH="default-branch"
           [ -z "$COMMIT_HASH" ] && COMMIT_HASH="no-commit"
 
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+          # Sanitize branch name (replace invalid characters)
+          BRANCH_SANITIZED=$(echo "$BRANCH" | sed 's/[^a-zA-Z0-9._-]/-/g' | sed 's/-$//')
+
+          echo "BRANCH_SANITIZED=$BRANCH_SANITIZED" >> $GITHUB_ENV
           echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
 
-      - name: Sanitize Inputs
+      - name: Get current version
+        id: version
         run: |
-          # Sanitize service name
-          SERVICE_NAME="${{ github.event.inputs.serviceName }}"
-          BRANCH_NAME="${{ env.BRANCH }}"
-          VERSION="${{ steps.version.outputs.version }}"
-          COMMIT_HASH="${{ env.COMMIT_HASH }}"
+          VERSION=$(cat .version || echo "0")
+          echo "VERSION=$VERSION"
+          echo $((VERSION + 1)) > .version
+          echo "::set-output name=version::$VERSION"
+        shell: bash
 
-          # Replace invalid characters in service name and branch
-          SERVICE_NAME_CLEANED=$(echo $SERVICE_NAME | sed 's/[^a-zA-Z0-9._-]/-/g')
-          BRANCH_NAME_CLEANED=$(echo $BRANCH_NAME | sed 's/[^a-zA-Z0-9._-]/-/g')
-
-          # Ensure tag doesn't end with a dash
-          CLEAN_TAG="${BRANCH_NAME_CLEANED}-${COMMIT_HASH}-${VERSION}"
-          CLEAN_TAG=$(echo $CLEAN_TAG | sed 's/-$//')
-
-          echo "SERVICE_NAME_CLEANED=$SERVICE_NAME_CLEANED" >> $GITHUB_ENV
-          echo "CLEAN_TAG=$CLEAN_TAG" >> $GITHUB_ENV
+      - name: Debug tag inputs
+        run: |
+          echo "Branch: ${{ env.BRANCH_SANITIZED }}"
+          echo "Commit Hash: ${{ env.COMMIT_HASH }}"
+          echo "Version: ${{ steps.version.outputs.version }}"
+          echo "Service Name: ${{ github.event.inputs.serviceName }}"
+          echo "Folder: ${{ github.event.inputs.folder }}"
 
       # Docker Login Step
       - name: Log in to Docker Hub
@@ -80,15 +82,15 @@ jobs:
           file: build/maven/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ env.SERVICE_NAME_CLEANED }}:${{ env.CLEAN_TAG }}
-          build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ env.SERVICE_NAME_CLEANED }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH_SANITIZED }}-${{ env.COMMIT_HASH }}-${{ steps.version.outputs.version }}
+          build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
 
       - name: DB Build and push
         if: ${{ github.event.inputs.dbMigration }}
         uses: docker/build-push-action@v5
         with:
-          context: ${{ github.event.inputs.folder }}/${{ env.SERVICE_NAME_CLEANED }}/src/main/resources/db
-          file: ${{ github.event.inputs.folder }}/${{ env.SERVICE_NAME_CLEANED }}/src/main/resources/db/Dockerfile
+          context: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db
+          file: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ env.SERVICE_NAME_CLEANED }}-db:${{ env.CLEAN_TAG }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ env.BRANCH_SANITIZED }}-${{ env.COMMIT_HASH }}-${{ steps.version.outputs.version }}
