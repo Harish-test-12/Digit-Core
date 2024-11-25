@@ -1,8 +1,5 @@
 name: Build Pipeline
 on:
-  push:
-    branches:
-      - 'master'
   workflow_dispatch:
     inputs:
       folder:
@@ -16,7 +13,7 @@ on:
         description: 'Provide the service name you want to build'
         required: true
       dbMigration:
-        description: 'Enable if you require DB migration for this service'
+        description: Enable if you require DB migration for this service'
         required: true
         type: boolean
       branch:
@@ -36,44 +33,28 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch }}
 
-      - name: Ensure .version exists
-        run: |
-          if [ ! -f .version ]; then
-            echo "0" > .version
-          fi
-
-      - name: Extract branch name and commit hash
-        id: tag
-        run: |
-          # Extract the branch name from the event or use a fallback
-          BRANCH=${GITHUB_REF##*/}
-          # If the branch name is 'master' or empty, replace it with 'main' or another default
-          [ -z "$BRANCH" ] && BRANCH="main"
-          [ "$BRANCH" == "master" ] && BRANCH="main"
-
-          # Extract the commit hash
-          COMMIT_HASH=$(git rev-parse --short HEAD)
-
-          # Fallback for commit hash if it's empty
-          [ -z "$COMMIT_HASH" ] && COMMIT_HASH="no-commit"
-
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
-          echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
-
-      - name: Get current version
-        id: version
-        run: |
-          VERSION=$(cat .version)
-          echo "VERSION=$VERSION"
-          echo $((VERSION + 1)) > .version
-          echo "::set-output name=version::$VERSION"
-        shell: bash          
-
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract branch name and commit hash
+        id: tag
+        run: |
+          BRANCH=${{ github.event.inputs.branch }}
+          COMMIT_HASH=$(git rev-parse --short HEAD || echo "no-commit")
+          VERSION=$(cat .version 2>/dev/null || echo "0")
+
+          # Increment version
+          NEW_VERSION=$((VERSION + 1))
+          echo $NEW_VERSION > .version
+
+          # Export variables
+          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+          echo "COMMIT_HASH=${COMMIT_HASH}" >> $GITHUB_ENV
+          echo "VERSION=${NEW_VERSION}" >> $GITHUB_ENV
+          echo "::set-output name=tag::${BRANCH}-${COMMIT_HASH}-${NEW_VERSION}"
 
       - name: Build and push application Docker image
         uses: docker/build-push-action@v5
@@ -82,9 +63,9 @@ jobs:
           file: build/maven/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ steps.version.outputs.version }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ env.VERSION }}
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
-
+            
   DB_Build:
     if: ${{ github.event.inputs.dbMigration == 'true' }}
     runs-on: ubuntu-latest
@@ -94,37 +75,31 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch }}
 
-      - name: Ensure .version exists
-        run: |
-          if [ ! -f .version ]; then
-            echo "0" > .version
-          fi
-
-      - name: Extract branch name and commit hash
-        id: tag
-        run: |
-          BRANCH=${GITHUB_REF##*/}
-          [ -z "$BRANCH" ] && BRANCH="main"
-          [ "$BRANCH" == "master" ] && BRANCH="main"
-          COMMIT_HASH=$(git rev-parse --short HEAD)
-          [ -z "$COMMIT_HASH" ] && COMMIT_HASH="no-commit"
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
-          echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
-
-      - name: Get current version
-        id: version
-        run: |
-          VERSION=$(cat .version)
-          echo "VERSION=$VERSION"
-          echo $((VERSION + 1)) > .version
-          echo "::set-output name=version::$VERSION"
-        shell: bash
+      - name: Debug dbMigration value
+        run: echo "dbMigration is ${{ github.event.inputs.dbMigration }}"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract branch name and commit hash for DB
+        id: tag
+        run: |
+          BRANCH=${{ github.event.inputs.branch }}
+          COMMIT_HASH=$(git rev-parse --short HEAD || echo "no-commit")
+          VERSION=$(cat .version 2>/dev/null || echo "0")
+
+          # Increment version
+          NEW_VERSION=$((VERSION + 1))
+          echo $NEW_VERSION > .version
+
+          # Export variables
+          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+          echo "COMMIT_HASH=${COMMIT_HASH}" >> $GITHUB_ENV
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "::set-output name=tag::${BRANCH}-${COMMIT_HASH}-${NEW_VERSION}"
 
       - name: Build and push database Docker image
         uses: docker/build-push-action@v5
@@ -133,4 +108,4 @@ jobs:
           file: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ steps.version.outputs.version }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ env.VERSION }}
