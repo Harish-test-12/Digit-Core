@@ -19,6 +19,10 @@ on:
         description: Enable if you require DB migration for this service
         required: true
         type: boolean
+      branch:  # Added new input for branch selection
+        description: 'Specify the branch you want to build'
+        required: true
+        default: 'master'  # Default value is master
 
 jobs:
   Build:
@@ -27,6 +31,8 @@ jobs:
     steps:
       - name: Check out the code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }} 
 
       - name: Ensure .version exists
         run: |
