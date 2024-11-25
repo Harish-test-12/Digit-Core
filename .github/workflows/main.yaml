@@ -67,13 +67,16 @@ jobs:
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
             
   DB_Build:
-    if: ${{ github.event.inputs.dbMigration == true }}
+    if: ${{ github.event.inputs.dbMigration == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out the code
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.branch }}
+
+      - name: Debug dbMigration value
+        run: echo "dbMigration is ${{ github.event.inputs.dbMigration }}"
 
       - name: Extract branch name and commit hash for DB
         id: tag
