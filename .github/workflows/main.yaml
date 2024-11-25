@@ -49,15 +49,22 @@ jobs:
 
       - name: Sanitize Inputs
         run: |
+          # Sanitize service name
           SERVICE_NAME="${{ github.event.inputs.serviceName }}"
           BRANCH_NAME="${{ env.BRANCH }}"
-          
-          # Replace invalid characters with dashes
+          VERSION="${{ steps.version.outputs.version }}"
+          COMMIT_HASH="${{ env.COMMIT_HASH }}"
+
+          # Replace invalid characters in service name and branch
           SERVICE_NAME_CLEANED=$(echo $SERVICE_NAME | sed 's/[^a-zA-Z0-9._-]/-/g')
           BRANCH_NAME_CLEANED=$(echo $BRANCH_NAME | sed 's/[^a-zA-Z0-9._-]/-/g')
-          
+
+          # Ensure tag doesn't end with a dash
+          CLEAN_TAG="${BRANCH_NAME_CLEANED}-${COMMIT_HASH}-${VERSION}"
+          CLEAN_TAG=$(echo $CLEAN_TAG | sed 's/-$//')
+
           echo "SERVICE_NAME_CLEANED=$SERVICE_NAME_CLEANED" >> $GITHUB_ENV
-          echo "BRANCH_NAME_CLEANED=$BRANCH_NAME_CLEANED" >> $GITHUB_ENV
+          echo "CLEAN_TAG=$CLEAN_TAG" >> $GITHUB_ENV
 
       # Docker Login Step
       - name: Log in to Docker Hub
@@ -73,7 +80,7 @@ jobs:
           file: build/maven/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ env.SERVICE_NAME_CLEANED }}:${{ env.BRANCH_NAME_CLEANED }}-${{ env.COMMIT_HASH }}-${{ steps.version.outputs.version }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ env.SERVICE_NAME_CLEANED }}:${{ env.CLEAN_TAG }}
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ env.SERVICE_NAME_CLEANED }}
 
       - name: DB Build and push
@@ -84,4 +91,4 @@ jobs:
           file: ${{ github.event.inputs.folder }}/${{ env.SERVICE_NAME_CLEANED }}/src/main/resources/db/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ env.SERVICE_NAME_CLEANED }}-db:${{ env.BRANCH_NAME_CLEANED }}-${{ env.COMMIT_HASH }}-${{ steps.version.outputs.version }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ env.SERVICE_NAME_CLEANED }}-db:${{ env.CLEAN_TAG }}
