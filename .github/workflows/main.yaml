@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - 'master'
-      - 'core-2.9-lts-mvn-check'
   workflow_dispatch:
     inputs:
       folder:
@@ -20,24 +19,24 @@ on:
         description: Enable if you require DB migration for this service
         required: true
         type: boolean
-      branch: # New input for selecting the branch
-        description: 'Specify the branch you want to build'
-        required: true
-        default: master
 
 jobs:
   Build:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out the code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.branch || github.ref_name }}
+
+      - name: Ensure .version exists
+        run: |
+          if [ ! -f .version ]; then
+            echo "0" > .version
+          fi
 
       - name: Extract branch name and commit hash
         id: tag
         run: |
-          # Extract branch name
           BRANCH=${GITHUB_REF##*/}
           COMMIT_HASH=$(git rev-parse --short HEAD)
 
@@ -45,35 +44,35 @@ jobs:
           [ -z "$BRANCH" ] && BRANCH="default-branch"
           [ -z "$COMMIT_HASH" ] && COMMIT_HASH="no-commit"
 
-          # Sanitize branch name (replace invalid characters)
-          BRANCH_SANITIZED=$(echo "$BRANCH" | sed 's/[^a-zA-Z0-9._-]/-/g' | sed 's/-$//')
-
-          echo "BRANCH_SANITIZED=$BRANCH_SANITIZED" >> $GITHUB_ENV
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
 
       - name: Get current version
         id: version
         run: |
-          VERSION=$(cat .version || echo "0")
+          VERSION=$(cat .version)
           echo "VERSION=$VERSION"
           echo $((VERSION + 1)) > .version
           echo "::set-output name=version::$VERSION"
         shell: bash
 
-      - name: Debug tag inputs
-        run: |
-          echo "Branch: ${{ env.BRANCH_SANITIZED }}"
-          echo "Commit Hash: ${{ env.COMMIT_HASH }}"
-          echo "Version: ${{ steps.version.outputs.version }}"
-          echo "Service Name: ${{ github.event.inputs.serviceName }}"
-          echo "Folder: ${{ github.event.inputs.folder }}"
+      - name: Archive business-services folder
+        run: tar -czf business-services.tar.gz business-services/
 
-      # Docker Login Step
+      - name: Upload business-services folder as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: business-services-artifact
+          path: business-services.tar.gz
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -82,7 +81,7 @@ jobs:
           file: build/maven/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH_SANITIZED }}-${{ env.COMMIT_HASH }}-${{ steps.version.outputs.version }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ steps.version.outputs.version }}
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
 
       - name: DB Build and push
@@ -93,4 +92,4 @@ jobs:
           file: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ env.BRANCH_SANITIZED }}-${{ env.COMMIT_HASH }}-${{ steps.version.outputs.version }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ steps.version.outputs.version }}
