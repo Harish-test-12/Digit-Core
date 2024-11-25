@@ -27,13 +27,12 @@ on:
 
 jobs:
   Build:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out the code
         uses: actions/checkout@v4
         with:
-        ref: ${{ github.event.inputs.branch || github.ref_name }}
+          ref: ${{ github.event.inputs.branch || github.ref_name }}
 
       - name: Ensure .version exists
         run: |
