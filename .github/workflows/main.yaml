@@ -34,12 +34,6 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch || github.ref_name }}
 
-      - name: Ensure .version exists
-        run: |
-          if [ ! -f .version ]; then
-            echo "0" > .version
-          fi
-
       - name: Extract branch name and commit hash
         id: tag
         run: |
@@ -53,32 +47,24 @@ jobs:
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
 
-      - name: Get current version
-        id: version
+      - name: Sanitize Inputs
         run: |
-          VERSION=$(cat .version)
-          echo "VERSION=$VERSION"
-          echo $((VERSION + 1)) > .version
-          echo "::set-output name=version::$VERSION"
-        shell: bash
+          SERVICE_NAME="${{ github.event.inputs.serviceName }}"
+          BRANCH_NAME="${{ env.BRANCH }}"
+          
+          # Replace invalid characters with dashes
+          SERVICE_NAME_CLEANED=$(echo $SERVICE_NAME | sed 's/[^a-zA-Z0-9._-]/-/g')
+          BRANCH_NAME_CLEANED=$(echo $BRANCH_NAME | sed 's/[^a-zA-Z0-9._-]/-/g')
+          
+          echo "SERVICE_NAME_CLEANED=$SERVICE_NAME_CLEANED" >> $GITHUB_ENV
+          echo "BRANCH_NAME_CLEANED=$BRANCH_NAME_CLEANED" >> $GITHUB_ENV
 
-      # - name: Archive business-services folder
-      #   run: tar -czf business-services.tar.gz business-services/
-
-      # - name: Upload business-services folder as artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: business-services-artifact
-      #     path: business-services.tar.gz
-
+      # Docker Login Step
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -87,15 +73,15 @@ jobs:
           file: build/maven/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ steps.version.outputs.version }}
-          build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ env.SERVICE_NAME_CLEANED }}:${{ env.BRANCH_NAME_CLEANED }}-${{ env.COMMIT_HASH }}-${{ steps.version.outputs.version }}
+          build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ env.SERVICE_NAME_CLEANED }}
 
       - name: DB Build and push
         if: ${{ github.event.inputs.dbMigration }}
         uses: docker/build-push-action@v5
         with:
-          context: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db
-          file: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db/Dockerfile
+          context: ${{ github.event.inputs.folder }}/${{ env.SERVICE_NAME_CLEANED }}/src/main/resources/db
+          file: ${{ github.event.inputs.folder }}/${{ env.SERVICE_NAME_CLEANED }}/src/main/resources/db/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ steps.version.outputs.version }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ env.SERVICE_NAME_CLEANED }}-db:${{ env.BRANCH_NAME_CLEANED }}-${{ env.COMMIT_HASH }}-${{ steps.version.outputs.version }}
