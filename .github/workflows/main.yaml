@@ -1,3 +1,7 @@
+
+
+Latest one
+
 name: Build Pipeline
 on:
   workflow_dispatch:
@@ -27,6 +31,8 @@ on:
 jobs:
   Build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.tag.outputs.version }} # Pass the version as output
     steps:
       - name: Check out the code
         uses: actions/checkout@v4
@@ -39,41 +45,46 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Generate version file
-        id: version
+      - name: Extract branch name and commit hash
+        id: tag
         run: |
-          VERSION_FILE=".version"
           BRANCH=${{ github.event.inputs.branch }}
           COMMIT_HASH=$(git rev-parse --short HEAD || echo "no-commit")
-          VERSION=$(cat ${VERSION_FILE} 2>/dev/null || echo "0")
+          VERSION=$(cat .version 2>/dev/null || echo "0")
 
+          # Increment version
           NEW_VERSION=$((VERSION + 1))
-          echo "${NEW_VERSION}" > ${VERSION_FILE}
+          echo $NEW_VERSION > .version
 
           # Export variables
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
           echo "COMMIT_HASH=${COMMIT_HASH}" >> $GITHUB_ENV
           echo "VERSION=${NEW_VERSION}" >> $GITHUB_ENV
           echo "::set-output name=tag::${BRANCH}-${COMMIT_HASH}-${NEW_VERSION}"
+          echo "::set-output name=version::${NEW_VERSION}"
 
-      - name: Save version file
-        uses: actions/upload-artifact@v3
+      - name: Build and push application Docker image
+        uses: docker/build-push-action@v5
         with:
-          name: version-file
-          path: .version
-
-      - name: Verify artifact upload
-        run: ls -la
+          context: .
+          file: build/maven/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ env.VERSION }}
+          build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
 
   DB_Build:
-    needs: Build
     if: ${{ github.event.inputs.dbMigration == 'true' }}
     runs-on: ubuntu-latest
+    needs: Build  # Ensure this waits for the Build job to complete
     steps:
       - name: Check out the code
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.branch }}
+
+      - name: Debug dbMigration value
+        run: echo "dbMigration is ${{ github.event.inputs.dbMigration }}"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
@@ -81,27 +92,14 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Download version file
-        uses: actions/download-artifact@v3
-        with:
-          name: version-file
-
-      - name: Verify downloaded artifact
-        run: |
-          if [ ! -f .version ]; then
-            echo "Artifact not found!"
-            exit 1
-          fi
-          echo "Downloaded artifact:"
-          cat .version
-
-      - name: Generate Docker tags for DB
+      - name: Extract branch name and commit hash for DB
         id: tag
         run: |
-          VERSION=$(cat .version)
           BRANCH=${{ github.event.inputs.branch }}
           COMMIT_HASH=$(git rev-parse --short HEAD || echo "no-commit")
+          VERSION=${{ needs.Build.outputs.version }} # Fetch from Build job output
 
+          # Export variables
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
           echo "COMMIT_HASH=${COMMIT_HASH}" >> $GITHUB_ENV
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
