@@ -46,11 +46,11 @@ jobs:
           BRANCH=${{ github.event.inputs.branch }}
           COMMIT_HASH=$(git rev-parse --short HEAD || echo "no-commit")
           VERSION=$(cat ${VERSION_FILE} 2>/dev/null || echo "0")
-          
+
           NEW_VERSION=$((VERSION + 1))
           echo "${NEW_VERSION}" > ${VERSION_FILE}
 
-          # Print the generated values
+          # Export variables
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
           echo "COMMIT_HASH=${COMMIT_HASH}" >> $GITHUB_ENV
           echo "VERSION=${NEW_VERSION}" >> $GITHUB_ENV
@@ -62,15 +62,8 @@ jobs:
           name: version-file
           path: .version
 
-      - name: Build and push application Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: build/maven/Dockerfile
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ env.VERSION }}
-          build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
+      - name: Verify artifact upload
+        run: ls -la
 
   DB_Build:
     needs: Build
@@ -93,12 +86,13 @@ jobs:
         with:
           name: version-file
 
-      - name: Verify downloaded version file
+      - name: Verify downloaded artifact
         run: |
           if [ ! -f .version ]; then
-            echo "Version file not found!"
+            echo "Artifact not found!"
             exit 1
           fi
+          echo "Downloaded artifact:"
           cat .version
 
       - name: Generate Docker tags for DB
