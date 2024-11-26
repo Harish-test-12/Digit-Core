@@ -73,6 +73,7 @@ jobs:
           path: .version
 
   DB_Build:
+    needs: Build # Ensure this job waits for Build to finish
     if: ${{ github.event.inputs.dbMigration == 'true' }}
     runs-on: ubuntu-latest
     steps:
