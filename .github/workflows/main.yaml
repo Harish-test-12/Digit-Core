@@ -39,31 +39,24 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract branch name and commit hash
-        id: tag
+      - name: Generate version file
+        id: version
         run: |
+          VERSION_FILE=".version"
           BRANCH=${{ github.event.inputs.branch }}
           COMMIT_HASH=$(git rev-parse --short HEAD || echo "no-commit")
-          VERSION=$(cat .version 2>/dev/null || echo "0")
-
-          # Increment version
+          VERSION=$(cat ${VERSION_FILE} 2>/dev/null || echo "0")
+          
           NEW_VERSION=$((VERSION + 1))
-          echo $NEW_VERSION > .version
+          echo "${NEW_VERSION}" > ${VERSION_FILE}
 
-          # Export variables
+          # Print the generated values
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
           echo "COMMIT_HASH=${COMMIT_HASH}" >> $GITHUB_ENV
           echo "VERSION=${NEW_VERSION}" >> $GITHUB_ENV
           echo "::set-output name=tag::${BRANCH}-${COMMIT_HASH}-${NEW_VERSION}"
 
-      - name: Verify .version file exists
-        run: |
-          if [ ! -f .version ]; then
-            echo "Version file not found, creating a default one."
-            echo "1" > .version
-          fi
-
-      - name: Save version for downstream jobs
+      - name: Save version file
         uses: actions/upload-artifact@v3
         with:
           name: version-file
@@ -100,22 +93,21 @@ jobs:
         with:
           name: version-file
 
-      - name: Verify .version content
+      - name: Verify downloaded version file
         run: |
           if [ ! -f .version ]; then
-            echo "Version file not found in DB_Build."
+            echo "Version file not found!"
             exit 1
           fi
           cat .version
 
-      - name: Extract branch name and commit hash for DB
+      - name: Generate Docker tags for DB
         id: tag
         run: |
+          VERSION=$(cat .version)
           BRANCH=${{ github.event.inputs.branch }}
           COMMIT_HASH=$(git rev-parse --short HEAD || echo "no-commit")
-          VERSION=$(cat .version)
 
-          # Export variables
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
           echo "COMMIT_HASH=${COMMIT_HASH}" >> $GITHUB_ENV
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
