@@ -39,6 +39,12 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Download the version file (if exists)
+        uses: actions/download-artifact@v3
+        with:
+          name: version-file
+          path: .
+
       - name: Extract branch name, commit hash, and version
         id: tag
         run: |
@@ -67,7 +73,7 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ env.VERSION }}
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
 
-      - name: Build and push database Docker image (only if dbMigration is true)
+      - name: Build and push database Docker image
         if: ${{ github.event.inputs.dbMigration == 'true' }}
         uses: docker/build-push-action@v5
         with:
