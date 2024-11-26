@@ -56,6 +56,19 @@ jobs:
           echo "VERSION=${NEW_VERSION}" >> $GITHUB_ENV
           echo "::set-output name=tag::${BRANCH}-${COMMIT_HASH}-${NEW_VERSION}"
 
+      - name: Verify .version file exists
+        run: |
+          if [ ! -f .version ]; then
+            echo "Version file not found, creating a default one."
+            echo "1" > .version
+          fi
+
+      - name: Save version for downstream jobs
+        uses: actions/upload-artifact@v3
+        with:
+          name: version-file
+          path: .version
+
       - name: Build and push application Docker image
         uses: docker/build-push-action@v5
         with:
@@ -66,14 +79,8 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.BRANCH }}-${{ env.COMMIT_HASH }}-${{ env.VERSION }}
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
 
-      - name: Save version for downstream jobs
-        uses: actions/upload-artifact@v3
-        with:
-          name: version-file
-          path: .version
-
   DB_Build:
-    needs: Build # Ensure this job waits for Build to finish
+    needs: Build
     if: ${{ github.event.inputs.dbMigration == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -92,6 +99,14 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: version-file
+
+      - name: Verify .version content
+        run: |
+          if [ ! -f .version ]; then
+            echo "Version file not found in DB_Build."
+            exit 1
+          fi
+          cat .version
 
       - name: Extract branch name and commit hash for DB
         id: tag
