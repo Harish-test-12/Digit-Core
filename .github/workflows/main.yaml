@@ -41,17 +41,18 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Step 3: Check if the version file exists locally or create it
-      - name: Prepare the version file
+      # Step 3: Check if the version file exists locally or as an artifact
+      - name: Check and prepare the version file
         id: prepare_version
         run: |
-          # Check if .version exists, else create it
-          if [ -f "$GITHUB_WORKSPACE/.version" ]; then
+          # Check if a previously uploaded artifact exists
+          if [ -f $GITHUB_WORKSPACE/.version ]; then
             echo "Version file found in workspace."
           else
             echo "No version file found. Creating new file."
-            echo "0" > "$GITHUB_WORKSPACE/.version"
+            echo "0" > $GITHUB_WORKSPACE/.version
           fi
+        continue-on-error: true
 
       # Step 4: Generate a unique tag
       - name: Generate a unique tag
@@ -81,14 +82,6 @@ jobs:
           echo "::set-output name=tag::${TAG}"
           echo "::set-output name=version::${NEW_VERSION}"
 
-      # Debugging Step - Verify .version file and generated tag
-      - name: Verify .version file and tag
-        run: |
-          echo "Generated Tag: ${{ steps.tag.outputs.tag }}"
-          echo "Generated Version: ${{ steps.tag.outputs.version }}"
-          echo "Contents of .version:"
-          cat $GITHUB_WORKSPACE/.version
-
       # Step 5: Build and push the application Docker image
       - name: Build and push application Docker image
         uses: docker/build-push-action@v5
@@ -111,9 +104,17 @@ jobs:
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ steps.tag.outputs.tag }}
 
-      # Step 7: Upload the updated version file
-      - name: Save the .version file as an artifact
+      # Step 7: Verify the .version file and tag
+      - name: Verify .version file and tag
+        run: |
+          echo "Generated Tag: ${{ steps.tag.outputs.tag }}"
+          echo "Generated Version: ${{ steps.tag.outputs.version }}"
+          echo "Contents of .version:"
+          cat $GITHUB_WORKSPACE/.version
+
+      # Step 8: Upload the updated version file
+      - name: Upload version file as an artifact
         uses: actions/upload-artifact@v3
         with:
           name: version-file
-          path: $GITHUB_WORKSPACE/.version
+          path: .version
