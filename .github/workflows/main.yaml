@@ -41,16 +41,14 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Step 3: Check if the version file exists locally or as an artifact
+      # Step 3: Check if .version exists, else create it
       - name: Check and prepare the version file
-        id: prepare_version
         run: |
-          # Check if a previously uploaded artifact exists
-          if [ -f $GITHUB_WORKSPACE/.version ]; then
-            echo "Version file found in workspace."
-          else
-            echo "No version file found. Creating new file."
+          if [ ! -f $GITHUB_WORKSPACE/.version ]; then
+            echo "No version file found. Creating new version file."
             echo "0" > $GITHUB_WORKSPACE/.version
+          else
+            echo "Version file found in workspace."
           fi
         continue-on-error: true
 
@@ -104,17 +102,9 @@ jobs:
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ steps.tag.outputs.tag }}
 
-      # Step 7: Verify the .version file and tag
-      - name: Verify .version file and tag
-        run: |
-          echo "Generated Tag: ${{ steps.tag.outputs.tag }}"
-          echo "Generated Version: ${{ steps.tag.outputs.version }}"
-          echo "Contents of .version:"
-          cat $GITHUB_WORKSPACE/.version
-
-      # Step 8: Upload the updated version file
-      - name: Upload version file as an artifact
+      # Step 7: Upload the updated .version file
+      - name: Upload the updated .version file
         uses: actions/upload-artifact@v3
         with:
           name: version-file
-          path: .version
+          path: $GITHUB_WORKSPACE/.version
