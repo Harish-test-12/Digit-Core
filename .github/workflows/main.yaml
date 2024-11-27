@@ -46,11 +46,12 @@ jobs:
         id: prepare_version
         run: |
           # Check if .version exists, else create it
-          if [ -f $GITHUB_WORKSPACE/.version ]; then
+          if [ -f "$GITHUB_WORKSPACE/.version" ]; then
             echo "Version file found in workspace."
           else
             echo "No version file found. Creating new file."
-            echo "0" > $GITHUB_WORKSPACE/.version
+            echo "0" > "$GITHUB_WORKSPACE/.version"
+          fi
 
       # Step 4: Generate a unique tag
       - name: Generate a unique tag
