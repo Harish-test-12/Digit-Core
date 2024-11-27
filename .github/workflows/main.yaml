@@ -50,7 +50,11 @@ jobs:
           else
             echo "Version file found in workspace."
           fi
-        continue-on-error: true
+
+      # Debugging step to check contents of .version
+      - name: Debug - Check the contents of .version
+        run: |
+          cat $GITHUB_WORKSPACE/.version
 
       # Step 4: Generate a unique tag
       - name: Generate a unique tag
@@ -78,9 +82,8 @@ jobs:
           echo "COMMIT_HASH=${COMMIT_HASH}" >> $GITHUB_ENV
           echo "VERSION=${NEW_VERSION}" >> $GITHUB_ENV
           echo "::set-output name=tag::${TAG}"
-          echo "::set-output name=version::${NEW_VERSION}"
 
-      # Step 5: Build and push the application Docker image
+      # Step 5: Build and push application Docker image
       - name: Build and push application Docker image
         uses: docker/build-push-action@v5
         with:
@@ -91,19 +94,8 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ steps.tag.outputs.tag }}
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
 
-      # Step 6: Build and push the database Docker image (conditionally)
-      - name: Build and push database Docker image
-        if: ${{ github.event.inputs.dbMigration == 'true' }}
-        uses: docker/build-push-action@v5
-        with:
-          context: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db
-          file: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db/Dockerfile
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ steps.tag.outputs.tag }}
-
-      # Step 7: Upload the updated .version file
-      - name: Upload the updated .version file
+      # Step 6: Upload the updated .version file as an artifact
+      - name: Upload the updated .version file as an artifact
         uses: actions/upload-artifact@v3
         with:
           name: version-file
