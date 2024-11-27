@@ -105,9 +105,18 @@ jobs:
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ steps.tag.outputs.tag }}
 
+      - name: Verify .version file exists
+        run: |
+          echo "Listing contents of the workspace before upload:"
+          ls -al $GITHUB_WORKSPACE
+          echo "Contents of .version file:"
+          cat $GITHUB_WORKSPACE/.version
+
+
       # Step 6: Upload .version file as an artifact
       - name: Upload .version file as an artifact
         uses: actions/upload-artifact@v3
         with:
           name: version-file
           path: $GITHUB_WORKSPACE/.version
+          continue-on-error: false  # Will stop the job if this fails
