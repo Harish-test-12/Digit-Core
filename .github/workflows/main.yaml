@@ -49,6 +49,12 @@ jobs:
           path: .
         continue-on-error: true
 
+      # Debugging Step - Check the version file content
+      - name: Debug version file
+        run: |
+          ls -alh .version
+          cat .version || echo "No version file found"
+
       # Step 4: Generate a unique tag
       - name: Generate a unique tag
         id: tag
