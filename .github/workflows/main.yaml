@@ -34,43 +34,44 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch }}
 
-      # Log in to Docker Hub
+      # Step 2: Log in to Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Step 2: Check if .version exists and prepare it
-      - name: Check if .version exists and prepare it
-        id: prepare_version
+      # Step 3: Check if .version exists, else create it
+      - name: Check and prepare the version file
         run: |
-          echo "Checking if .version file exists"
-          if [ -f $GITHUB_WORKSPACE/.version ]; then
-            echo "Version file found in workspace."
-          else
+          if [ ! -f $GITHUB_WORKSPACE/.version ]; then
             echo "No version file found. Creating new version file."
             echo "0" > $GITHUB_WORKSPACE/.version
+          else
+            echo "Version file found in workspace."
           fi
-          echo "Listing contents of the workspace:"
-          ls -al $GITHUB_WORKSPACE
-          echo "Contents of .version:"
+
+      # Debugging step to check contents of .version
+      - name: Debug - Check the contents of .version
+        run: |
           cat $GITHUB_WORKSPACE/.version
 
-      # Step 3: Generate a unique tag
+      # Step 4: Generate a unique tag
       - name: Generate a unique tag
         id: tag
         run: |
           BRANCH=${{ github.event.inputs.branch }}
           COMMIT_HASH=$(git rev-parse --short HEAD || echo "no-commit")
 
-          # Read the version from the .version file
-          VERSION=$(cat $GITHUB_WORKSPACE/.version)
+          # Read or initialize the version file
+          if [ -f $GITHUB_WORKSPACE/.version ]; then
+            VERSION=$(cat $GITHUB_WORKSPACE/.version)
+          else
+            VERSION=0
+          fi
 
           # Increment the version
           NEW_VERSION=$((VERSION + 1))
-
-          # Update .version file with the new version
           echo $NEW_VERSION > $GITHUB_WORKSPACE/.version
 
           # Create the tag
@@ -81,9 +82,8 @@ jobs:
           echo "COMMIT_HASH=${COMMIT_HASH}" >> $GITHUB_ENV
           echo "VERSION=${NEW_VERSION}" >> $GITHUB_ENV
           echo "::set-output name=tag::${TAG}"
-          echo "::set-output name=version::${NEW_VERSION}"
 
-      # Step 4: Build and push application Docker image
+      # Step 5: Build and push application Docker image
       - name: Build and push application Docker image
         uses: docker/build-push-action@v5
         with:
@@ -94,40 +94,9 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ steps.tag.outputs.tag }}
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
 
-      # Step 5: Build and push database Docker image (conditionally)
-      - name: Build and push database Docker image
-        if: ${{ github.event.inputs.dbMigration == 'true' }}
-        uses: docker/build-push-action@v5
-        with:
-          context: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db
-          file: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db/Dockerfile
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ steps.tag.outputs.tag }}
-
-      # Step 6: Upload .version file as an artifact
-      - name: Upload .version file as an artifact
+      # Step 6: Upload the updated .version file as an artifact
+      - name: Upload the updated .version file as an artifact
         uses: actions/upload-artifact@v3
         with:
           name: version-file
           path: $GITHUB_WORKSPACE/.version
-
-  Verify:
-    runs-on: ubuntu-latest
-    needs: Build
-    steps:
-      # Step 1: Download the .version artifact
-      - name: Download .version artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: version-file
-
-      # Step 2: Verify the version file after download
-      - name: Verify version and tag
-        run: |
-          echo "Checking if .version file exists after download"
-          ls -al $GITHUB_WORKSPACE
-          echo "Contents of .version:"
-          cat $GITHUB_WORKSPACE/.version
-          echo "Generated Tag: ${GITHUB_ENV['tag']}"
-          echo "Generated Version: ${GITHUB_ENV['VERSION']}"
