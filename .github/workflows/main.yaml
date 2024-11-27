@@ -41,19 +41,18 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Step 3: Download the version file (if it exists)
-      - name: Download the version file
-        uses: actions/download-artifact@v3
-        with:
-          name: version-file
-          path: .
-        continue-on-error: true
-
-      # Debugging Step - Check the version file content
-      - name: Debug version file
+      # Step 3: Check if the version file exists locally or as an artifact
+      - name: Check and prepare the version file
+        id: prepare_version
         run: |
-          ls -alh .version
-          cat .version || echo "No version file found"
+          # Check if a previously uploaded artifact exists
+          if [ -f .version ]; then
+            echo "Version file already exists locally."
+          else
+            echo "No version file found locally. Creating new version file."
+            echo "0" > .version
+          fi
+        continue-on-error: true
 
       # Step 4: Generate a unique tag
       - name: Generate a unique tag
