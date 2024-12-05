@@ -117,18 +117,18 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USER }}/${{ github.event.inputs.serviceName }}-db:${{ env.NEXT_TAG }}
 
-      - name: Libraries Build and push
-        if: ${{ github.event.inputs.libraries == 'true' }} 
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ github.event.inputs.folder }}/libraries/${{ github.event.inputs.serviceName }}/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USER }}/${{ github.event.inputs.serviceName }}:${{ env.NEXT_TAG }}
-          build-args: |
-            WORK_DIR=${{ github.event.inputs.folder }}/libraries/${{ github.event.inputs.serviceName }}
-            nexusUsername=${{ secrets.NEXUS_USER }}
-            nexusPassword=${{ secrets.NEXUS_PWD }}
+      # - name: Libraries Build and push
+      #   if: ${{ github.event.inputs.libraries == 'true' }} 
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: .
+      #     file: ${{ github.event.inputs.folder }}/libraries/${{ github.event.inputs.serviceName }}/Dockerfile
+      #     push: true
+      #     tags: ${{ secrets.DOCKERHUB_USER }}/${{ github.event.inputs.serviceName }}:${{ env.NEXT_TAG }}
+      #     build-args: |
+      #       WORK_DIR=${{ github.event.inputs.folder }}/libraries/${{ github.event.inputs.serviceName }}
+      #       nexusUsername=${{ secrets.NEXUS_USER }}
+      #       nexusPassword=${{ secrets.NEXUS_PWD }}
 
       - name: Display Image details
         run: |
