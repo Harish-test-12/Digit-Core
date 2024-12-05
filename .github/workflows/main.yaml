@@ -11,7 +11,6 @@ on:
         type: choice
         options:
           - core-services
-          - business-services
       serviceName:
         description: 'Provide the service name you want to build'
         required: true
