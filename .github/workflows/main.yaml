@@ -12,10 +12,10 @@ on:
       serviceName:
         description: 'Provide the service name you want to build'
         required: true
-      dbMigration:
-        description: 'Enable if you require DB migration for this service'
-        required: true
-        type: boolean
+      # dbMigration:
+      #   description: 'Enable if you require DB migration for this service'
+      #   required: true
+      #   type: boolean
       branch:
         description: 'Select the branch you want to build'
         required: true
@@ -40,6 +40,21 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Check if DB folder exists
+        id: check_folder
+        run: |
+          if [ -d "${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db" ]; then
+            echo "folder_exists=true" >> $GITHUB_ENV
+          else
+            echo "folder_exists=false" >> $GITHUB_ENV
+          fi
+      - name: check DB Environment Variable
+        run: |
+          echo ${{ env.folder_exists }}
 
       # Step 3: Fetch existing tags and generate the next tag
       - name: Generate the next tag
@@ -77,8 +92,9 @@ jobs:
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
 
       # Step 5: Build and push database Docker image (conditionally)
-      - name: Build and push database Docker image
-        if: ${{ github.event.inputs.dbMigration == 'true' }}
+      - if: env.folder_exists == 'true'
+        name: Build and push database Docker image
+        if: env.folder_exists == 'true' && github.event.inputs.libraries == 'false'
         uses: docker/build-push-action@v5
         with:
           context: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db
