@@ -101,3 +101,11 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ steps.tag.outputs.tag }}
+
+      - name: Display Image details
+        run: >
+          echo "${{ secrets.DOCKER_USERNAME }}/${{
+          github.event.inputs.serviceName }}:${{ steps.tag.outputs.tag }}"
+ 
+          echo "${{ secrets.DOCKER_USERNAME }}/${{
+          github.event.inputs.serviceName }}-db:${{ steps.tag.outputs.tag }}"
