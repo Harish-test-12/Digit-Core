@@ -12,10 +12,6 @@ on:
       serviceName:
         description: 'Provide the service name you want to build'
         required: true
-      dbMigration:
-        description: 'Enable if you require DB migration for this service'
-        required: true
-        type: boolean
       branch:
         description: 'Select the branch you want to build'
         required: true
@@ -68,7 +64,19 @@ jobs:
           echo "::set-output name=tag::${NEXT_TAG}"
           echo "NEXT_TAG=${NEXT_TAG}" >> $GITHUB_ENV
 
-      # Step 4: Build and push application Docker image
+      # Step 4: Check if the DB folder exists
+      - name: Check if DB folder exists
+        id: check-db
+        run: |
+          DB_PATH="${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db"
+          if [ -d "$DB_PATH" ]; then
+            echo "DB folder exists."
+            echo "build_db=true" >> $GITHUB_ENV
+          else
+            echo "DB folder does not exist."
+            echo "build_db=false" >> $GITHUB_ENV
+
+      # Step 5: Build and push application Docker image
       - name: Build and push application Docker image
         uses: docker/build-push-action@v5
         with:
@@ -79,9 +87,9 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ steps.tag.outputs.tag }}
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
 
-      # Step 5: Build and push database Docker image (conditionally)
+      # Step 6: Build and push database Docker image (conditionally)
       - name: Build and push database Docker image
-        if: ${{ github.event.inputs.dbMigration == 'true' }}
+        if: env.build_db == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db
