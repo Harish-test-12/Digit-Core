@@ -34,56 +34,48 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch }}
 
-      # Step 2: Log in to Docker Hub
+      # Step 2: Display the branch name
+      - name: Display branch
+        run: |
+          echo "BRANCH=${{ github.event.inputs.branch }}" >> $GITHUB_ENV
+          echo "BRANCH=${{ github.event.inputs.branch }}"
+
+      # Step 3: Log in to Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Step 2: Check if .version exists and prepare it
-      - name: Check if .version exists and prepare it
-        id: prepare_version
+      # Step 4: Get the latest tag from Docker Hub and calculate the next tag
+      - name: Get latest Docker tag and increment
+        id: tag_calculation
         run: |
-          echo "Checking if .version file exists"
-          if [ -f $GITHUB_WORKSPACE/.version ]; then
-            echo "Version file found in workspace."
+          # Fetch tags from Docker Hub
+          TAGS=$(curl -s "https://hub.docker.com/v2/repositories/${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}/tags?page_size=100" | jq -r '.results[].name')
+          echo "Existing tags: $TAGS"
+
+          # Filter tags for the specific branch
+          LATEST_TAG=$(echo "$TAGS" | grep "^${{ github.event.inputs.branch }}-" | sort -V | tail -n 1)
+          echo "Latest tag: $LATEST_TAG"
+
+          if [ -z "$LATEST_TAG" ]; then
+            NEXT_TAG="${{ github.event.inputs.branch }}-1"
           else
-            echo "No version file found. Creating new version file."
-            echo "0" > $GITHUB_WORKSPACE/.version
+            TAG_NUMBER=$(echo "$LATEST_TAG" | awk -F- '{print $NF}')
+            NEXT_TAG="${{ github.event.inputs.branch }}-$((TAG_NUMBER + 1))"
           fi
-          echo "Listing contents of the workspace:"
-          ls -al $GITHUB_WORKSPACE
-          echo "Contents of .version:"
-          cat $GITHUB_WORKSPACE/.version
 
-      # Step 3: Generate a unique tag
-      - name: Generate a unique tag
-        id: tag
-        run: |
-          BRANCH=${{ github.event.inputs.branch }}
+          # Append the commit hash to the tag
           COMMIT_HASH=$(git rev-parse --short HEAD || echo "no-commit")
+          FINAL_TAG="$NEXT_TAG-$COMMIT_HASH"
 
-          # Read the version from the .version file
-          VERSION=$(cat $GITHUB_WORKSPACE/.version)
+          echo "NEXT_TAG=$NEXT_TAG" >> $GITHUB_ENV
+          echo "FINAL_TAG=$FINAL_TAG" >> $GITHUB_ENV
+          echo "::set-output name=next_tag::$NEXT_TAG"
+          echo "::set-output name=final_tag::$FINAL_TAG"
 
-          # Increment the version
-          NEW_VERSION=$((VERSION + 1))
-
-          # Update .version file with the new version
-          echo $NEW_VERSION > $GITHUB_WORKSPACE/.version
-
-          # Create the tag
-          TAG="${BRANCH}-${COMMIT_HASH}-${NEW_VERSION}"
-
-          # Export variables for the next steps
-          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
-          echo "COMMIT_HASH=${COMMIT_HASH}" >> $GITHUB_ENV
-          echo "VERSION=${NEW_VERSION}" >> $GITHUB_ENV
-          echo "::set-output name=tag::${TAG}"
-          echo "::set-output name=version::${NEW_VERSION}"
-
-      # Step 4: Build and push application Docker image
+      # Step 5: Build and push the application Docker image
       - name: Build and push application Docker image
         uses: docker/build-push-action@v5
         with:
@@ -91,10 +83,10 @@ jobs:
           file: build/maven/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ steps.tag.outputs.tag }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ env.FINAL_TAG }}
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
 
-      # Step 5: Build and push database Docker image (conditionally)
+      # Step 6: Build and push the database Docker image (conditionally)
       - name: Build and push database Docker image
         if: ${{ github.event.inputs.dbMigration == 'true' }}
         uses: docker/build-push-action@v5
@@ -103,20 +95,12 @@ jobs:
           file: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ steps.tag.outputs.tag }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ env.FINAL_TAG }}
 
-      - name: Verify .version file exists
+      # Step 7: Display the generated tag
+      - name: Display tag details
         run: |
-          echo "Listing contents of the workspace before upload:"
-          ls -al $GITHUB_WORKSPACE
-          echo "Contents of .version file:"
-          cat $GITHUB_WORKSPACE/.version
-
-
-      # Step 6: Upload .version file as an artifact
-      - name: Upload .version file as an artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: version-file
-          path: $GITHUB_WORKSPACE/.version
-          continue-on-error: false  # Will stop the job if this fails
+          echo "Generated application tag: ${{ env.FINAL_TAG }}"
+          if [ "${{ github.event.inputs.dbMigration }}" == "true" ]; then
+            echo "Generated DB tag: ${{ env.FINAL_TAG }}"
+          fi
