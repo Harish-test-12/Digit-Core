@@ -43,21 +43,26 @@ jobs:
         id: tag
         run: |
           # Set variables
-          BRANCH=${{ github.event.inputs.branch }}
+          BRANCH=master
           COMMIT_HASH=$(git rev-parse --short HEAD)
 
           # Fetch existing tags for the service
-          RESPONSE=$(curl -s -u "${{ secrets.DOCKER_USERNAME }}:${{ secrets.DOCKER_PASSWORD }}" "https://hub.docker.com/v2/repositories/${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}/tags?page_size=100")
+          RESPONSE=$(curl -s -u "${DOCKER_USERNAME}:${DOCKER_PASSWORD}" "https://hub.docker.com/v2/repositories/${DOCKER_USERNAME}/egov-indexer/tags?page_size=100")
 
           if [ -z "$RESPONSE" ] || [ "$RESPONSE" == "null" ]; then
             echo "No tags found or API request failed. Assuming this is a new service."
             EXISTING_TAGS=""
           else
-            EXISTING_TAGS=$(echo "$RESPONSE" | jq -r '.results[].name')
+            # Safely extract tag names from the response
+            EXISTING_TAGS=$(echo "$RESPONSE" | jq -r '.results[].name' || echo "")
           fi
 
           # Filter for the current branch and commit hash
-          LATEST_TAG=$(echo "$EXISTING_TAGS" | grep "^${BRANCH}-${COMMIT_HASH}-" | sort -V | tail -n 1)
+          if [ -z "$EXISTING_TAGS" ]; then
+            LATEST_TAG=""
+          else
+            LATEST_TAG=$(echo "$EXISTING_TAGS" | grep "^${BRANCH}-${COMMIT_HASH}-" | sort -V | tail -n 1)
+          fi
 
           if [ -z "$LATEST_TAG" ]; then
             # No tag exists for this branch and commit hash
@@ -71,6 +76,12 @@ jobs:
           # Export the next tag
           echo "::set-output name=tag::${NEXT_TAG}"
           echo "NEXT_TAG=${NEXT_TAG}" >> $GITHUB_ENV
+
+          # Debug information
+          echo "Response from Docker Hub: $RESPONSE"
+          echo "Existing tags: $EXISTING_TAGS"
+          echo "Latest tag: $LATEST_TAG"
+          echo "Next tag: $NEXT_TAG"
 
       # Step 4: Build and push application Docker image
       - name: Build and push application Docker image
