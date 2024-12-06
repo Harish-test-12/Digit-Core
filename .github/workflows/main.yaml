@@ -1,5 +1,4 @@
 name: Build Pipeline
-
 on:
   workflow_dispatch:
     inputs:
@@ -13,6 +12,10 @@ on:
       serviceName:
         description: 'Provide the service name you want to build'
         required: true
+      dbMigration:
+        description: 'Enable if you require DB migration for this service'
+        required: true
+        type: boolean
       branch:
         description: 'Select the branch you want to build'
         required: true
@@ -43,27 +46,14 @@ jobs:
         id: tag
         run: |
           # Set variables
-          BRANCH=master
+          BRANCH=${{ github.event.inputs.branch }}
           COMMIT_HASH=$(git rev-parse --short HEAD)
-
+          
           # Fetch existing tags for the service
-          RESPONSE=$(curl -s -u "${DOCKER_USERNAME}:${DOCKER_PASSWORD}" "https://hub.docker.com/v2/repositories/${DOCKER_USERNAME}/egov-indexer/tags?page_size=100")
-
-          if [ -z "$RESPONSE" ] || [ "$RESPONSE" == "null" ]; then
-            echo "No tags found or API request failed. Assuming this is a new service."
-            EXISTING_TAGS=""
-          else
-            # Safely extract tag names from the response
-            EXISTING_TAGS=$(echo "$RESPONSE" | jq -r '.results[].name' || echo "")
-          fi
-
+          EXISTING_TAGS=$(curl -s "https://hub.docker.com/v2/repositories/${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}/tags?page_size=100" | jq -r '.results[].name')
+          
           # Filter for the current branch and commit hash
-          if [ -z "$EXISTING_TAGS" ]; then
-            LATEST_TAG=""
-          else
-            LATEST_TAG=$(echo "$EXISTING_TAGS" | grep "^${BRANCH}-${COMMIT_HASH}-" | sort -V | tail -n 1)
-          fi
-
+          LATEST_TAG=$(echo "$EXISTING_TAGS" | grep "^${BRANCH}-${COMMIT_HASH}-" | sort -V | tail -n 1)
           if [ -z "$LATEST_TAG" ]; then
             # No tag exists for this branch and commit hash
             NEXT_TAG="${BRANCH}-${COMMIT_HASH}-1"
@@ -72,17 +62,9 @@ jobs:
             TAG_NUMBER=$(echo "$LATEST_TAG" | awk -F- '{print $NF}')
             NEXT_TAG="${BRANCH}-${COMMIT_HASH}-$((TAG_NUMBER + 1))"
           fi
-
           # Export the next tag
           echo "::set-output name=tag::${NEXT_TAG}"
           echo "NEXT_TAG=${NEXT_TAG}" >> $GITHUB_ENV
-
-          # Debug information
-          echo "Response from Docker Hub: $RESPONSE"
-          echo "Existing tags: $EXISTING_TAGS"
-          echo "Latest tag: $LATEST_TAG"
-          echo "Next tag: $NEXT_TAG"
-
       # Step 4: Build and push application Docker image
       - name: Build and push application Docker image
         uses: docker/build-push-action@v5
@@ -94,14 +76,13 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ steps.tag.outputs.tag }}
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
 
-      # Step 5: Check for 'db' folder and build DB image if present
-      - name: Check for DB folder and build DB image
-        run: |
-          DB_FOLDER="${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db"
-          if [ -d "$DB_FOLDER" ]; then
-            echo "DB folder found. Building DB image."
-            docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ steps.tag.outputs.tag }} -f $DB_FOLDER/Dockerfile $DB_FOLDER
-            docker push ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ steps.tag.outputs.tag }}
-          else
-            echo "No DB folder found. Skipping DB image build."
-          fi
+      # Step 5: Build and push database Docker image (conditionally)
+      - name: Build and push database Docker image
+        if: ${{ github.event.inputs.dbMigration == 'true' }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db
+          file: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ steps.tag.outputs.tag }}
