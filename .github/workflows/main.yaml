@@ -67,30 +67,41 @@ jobs:
           # Set variables
           BRANCH=${{ github.event.inputs.branch }}
           COMMIT_HASH=$(git rev-parse --short HEAD)
-          
-          # Log in to Docker Hub
+
+          # Log in to Docker Hub and fetch a token
           TOKEN=$(curl -s -X POST "https://hub.docker.com/v2/users/login/" \
             -H "Content-Type: application/json" \
             -d '{"username": "'$DOCKER_USERNAME'", "password": "'$DOCKER_PASSWORD'"}' | jq -r .token)
-          
-          # Fetch existing tags for the service
-          EXISTING_TAGS=$(curl -s -H "Authorization: JWT $TOKEN" \
-            "https://hub.docker.com/v2/repositories/$DOCKER_USERNAME/${{ github.event.inputs.serviceName }}/tags?page_size=100" | jq -r '.results[].name')
-          
-          # Filter for the current branch and commit hash
-          LATEST_TAG=$(echo "$EXISTING_TAGS" | grep "^${BRANCH}-${COMMIT_HASH}-" | sort -V | tail -n 1)
-          if [ -z "$LATEST_TAG" ]; then
-            # No tag exists for this branch and commit hash
+
+          # Check if the repository exists
+          REPO_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: JWT $TOKEN" \
+            "https://hub.docker.com/v2/repositories/$DOCKER_USERNAME/${{ github.event.inputs.serviceName }}/")
+
+          if [ "$REPO_CHECK" -ne 200 ]; then
+            echo "Repository does not exist. Assuming a first-time build."
             NEXT_TAG="${BRANCH}-${COMMIT_HASH}-1"
           else
-            # Increment the numeric part of the latest tag
-            TAG_NUMBER=$(echo "$LATEST_TAG" | awk -F- '{print $NF}')
-            NEXT_TAG="${BRANCH}-${COMMIT_HASH}-$((TAG_NUMBER + 1))"
+            # Fetch existing tags for the service
+            EXISTING_TAGS=$(curl -s -H "Authorization: JWT $TOKEN" \
+              "https://hub.docker.com/v2/repositories/$DOCKER_USERNAME/${{ github.event.inputs.serviceName }}/tags?page_size=100" | jq -r '.results[].name')
+
+            # Filter for the current branch and commit hash
+            LATEST_TAG=$(echo "$EXISTING_TAGS" | grep "^${BRANCH}-${COMMIT_HASH}-" | sort -V | tail -n 1)
+            if [ -z "$LATEST_TAG" ]; then
+              # No tag exists for this branch and commit hash
+              NEXT_TAG="${BRANCH}-${COMMIT_HASH}-1"
+            else
+              # Increment the numeric part of the latest tag
+              TAG_NUMBER=$(echo "$LATEST_TAG" | awk -F- '{print $NF}')
+              NEXT_TAG="${BRANCH}-${COMMIT_HASH}-$((TAG_NUMBER + 1))"
+            fi
           fi
-          
+
           # Export the next tag
           echo "::set-output name=tag::${NEXT_TAG}"
           echo "NEXT_TAG=${NEXT_TAG}" >> $GITHUB_ENV
+
 
       # - name: Generate the next tag
       #   id: tag
