@@ -1,5 +1,8 @@
 name: Build Pipeline
 on:
+  push:
+    branches:
+      - 'master'
   workflow_dispatch:
     inputs:
       folder:
@@ -16,13 +19,17 @@ on:
       #   description: 'Enable if you require DB migration for this service'
       #   required: true
       #   type: boolean
-      branch:
-        description: 'Select the branch you want to build'
+      libraries:
+        description: Enable if you want to upload to libraries
         required: true
-        type: choice
-        options:
-          - master
-          - core-2.9-lts-mvn-check
+        type: boolean
+      # branch:
+      #   description: 'Select the branch you want to build'
+      #   required: true
+      #   type: choice
+      #   options:
+      #     - master
+      #     - core-2.9-lts-mvn-check
 
 jobs:
   Build:
@@ -102,31 +109,6 @@ jobs:
           echo "::set-output name=tag::${NEXT_TAG}"
           echo "NEXT_TAG=${NEXT_TAG}" >> $GITHUB_ENV
 
-
-      # - name: Generate the next tag
-      #   id: tag
-      #   run: |
-      #     # Set variables
-      #     BRANCH=${{ github.event.inputs.branch }}
-      #     COMMIT_HASH=$(git rev-parse --short HEAD)
-          
-      #     # Fetch existing tags for the service
-      #     EXISTING_TAGS=$(curl -s "https://hub.docker.com/v2/repositories/${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}/tags?page_size=100" | jq -r '.results[].name')
-          
-      #     # Filter for the current branch and commit hash
-      #     LATEST_TAG=$(echo "$EXISTING_TAGS" | grep "^${BRANCH}-${COMMIT_HASH}-" | sort -V | tail -n 1)
-      #     if [ -z "$LATEST_TAG" ]; then
-      #       # No tag exists for this branch and commit hash
-      #       NEXT_TAG="${BRANCH}-${COMMIT_HASH}-1"
-      #     else
-      #       # Increment the numeric part of the latest tag
-      #       TAG_NUMBER=$(echo "$LATEST_TAG" | awk -F- '{print $NF}')
-      #       NEXT_TAG="${BRANCH}-${COMMIT_HASH}-$((TAG_NUMBER + 1))"
-      #     fi
-      #     # Export the next tag
-      #     echo "::set-output name=tag::${NEXT_TAG}"
-      #     echo "NEXT_TAG=${NEXT_TAG}" >> $GITHUB_ENV
-      # Step 4: Build and push application Docker image
       - name: Build and push application Docker image
         uses: docker/build-push-action@v5
         with:
@@ -148,6 +130,19 @@ jobs:
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}-db:${{ steps.tag.outputs.tag }}
 
+      - name: Libraries Build and push
+        if: ${{ github.event.inputs.libraries == 'true' }} 
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ github.event.inputs.folder }}/libraries/${{ github.event.inputs.serviceName }}/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/${{ github.event.inputs.serviceName }}:${{ steps.tag.outputs.tag }}
+          build-args: |
+            WORK_DIR=${{ github.event.inputs.folder }}/libraries/${{ github.event.inputs.serviceName }}
+            nexusUsername=${{ secrets.NEXUS_USER }}
+            nexusPassword=${{ secrets.NEXUS_PWD }}    
+    
       - name: Display Image details
         run: >
           echo "${{ secrets.DOCKER_USERNAME }}/${{
