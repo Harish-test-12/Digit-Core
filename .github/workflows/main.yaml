@@ -1,8 +1,5 @@
 name: Build Pipeline
 on:
-  push:
-    branches:
-      - 'master'
   workflow_dispatch:
     inputs:
       folder:
@@ -23,13 +20,13 @@ on:
         description: Enable if you want to upload to libraries
         required: true
         type: boolean
-      # branch:
-      #   description: 'Select the branch you want to build'
-      #   required: true
-      #   type: choice
-      #   options:
-      #     - master
-      #     - core-2.9-lts-mvn-check
+      branch:
+        description: 'Select the branch you want to build'
+        required: true
+        type: choice
+        options:
+          - master
+          - core-2.9-lts-mvn-check
 
 jobs:
   Build:
