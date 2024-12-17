@@ -118,8 +118,8 @@ jobs:
           build-args: WORK_DIR=${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}
 
       # Step 5: Build and push database Docker image (conditionally)
-      - if: env.folder_exists == 'true'
-        name: Build and push database Docker image
+      - name: Build and push database Docker image
+        if: env.folder_exists == 'true' && github.event.inputs.libraries == 'false'
         uses: docker/build-push-action@v5
         with:
           context: ${{ github.event.inputs.folder }}/${{ github.event.inputs.serviceName }}/src/main/resources/db
