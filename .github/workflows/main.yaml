@@ -107,6 +107,7 @@ jobs:
           echo "NEXT_TAG=${NEXT_TAG}" >> $GITHUB_ENV
 
       - name: Build and push application Docker image
+        if: ${{ github.event.inputs.libraries == 'false' }}
         uses: docker/build-push-action@v5
         with:
           context: .
